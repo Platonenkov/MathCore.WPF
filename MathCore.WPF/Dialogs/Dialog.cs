@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using MathCore.WPF.Commands;
@@ -8,12 +9,14 @@ using MathCore.WPF.Commands;
 
 namespace MathCore.WPF.Dialogs
 {
+    /// <summary>Диалог</summary>
     public abstract class Dialog : DependencyObject, ICommand
     {
         #region Dependency properties
 
-        #region Title property
+        #region Title : bool  - Заголовок диалога
 
+        /// <summary>Заголовок диалога</summary>
         public static readonly DependencyProperty TitleProperty =
             DependencyProperty.Register(
                 nameof(Title),
@@ -21,6 +24,7 @@ namespace MathCore.WPF.Dialogs
                 typeof(Dialog),
                 new PropertyMetadata(default(string)));
 
+        /// <summary>Заголовок диалога</summary>
         public string Title
         {
             get => (string)GetValue(TitleProperty);
@@ -29,28 +33,32 @@ namespace MathCore.WPF.Dialogs
 
         #endregion
 
-        #region IsOpened property
+        #region IsOpened : bool - Диалог в данный момент открыт
 
-        private static readonly DependencyPropertyKey IsOpenedPropertyKey =
+        private static readonly DependencyPropertyKey __IsOpenedPropertyKey =
             DependencyProperty.RegisterReadOnly(
                 nameof(IsOpened),
                 typeof(bool),
                 typeof(Dialog),
-                new FrameworkPropertyMetadata(default(bool),
-                    (d, e) => CommandManager.InvalidateRequerySuggested()));
+                new FrameworkPropertyMetadata(
+                    default(bool), 
+                    (_,_) => CommandManager.InvalidateRequerySuggested()));
 
-        public static readonly DependencyProperty IsOpenedProperty = IsOpenedPropertyKey.DependencyProperty;
+        /// <summary>Диалог в данный момент открыт</summary>
+        public static readonly DependencyProperty IsOpenedProperty = __IsOpenedPropertyKey.DependencyProperty;
 
+        /// <summary>Диалог в данный момент открыт</summary>
         public bool IsOpened
         {
             get => (bool)GetValue(IsOpenedProperty);
-            protected set => SetValue(IsOpenedPropertyKey, value);
+            protected set => SetValue(__IsOpenedPropertyKey, value);
         }
 
         #endregion
 
-        #region UpdateIfResultFalse property
+        #region UpdateIfResultFalse : bool - Обновлять состояние в случае отрицательного выбора пользователя
 
+        /// <summary>Обновлять состояние в случае отрицательного выбора пользователя</summary>
         public static readonly DependencyProperty UpdateIfResultFalseProperty =
             DependencyProperty.Register(
                 nameof(UpdateIfResultFalse),
@@ -58,6 +66,7 @@ namespace MathCore.WPF.Dialogs
                 typeof(Dialog),
                 new PropertyMetadata(default(bool)));
 
+        /// <summary>Обновлять состояние в случае отрицательного выбора пользователя</summary>
         public bool UpdateIfResultFalse
         {
             get => (bool)GetValue(UpdateIfResultFalseProperty);
@@ -83,22 +92,45 @@ namespace MathCore.WPF.Dialogs
 
         #endregion
 
+        #region Enabled : bool - Включить диалог
+
+        /// <summary>Включить диалог</summary>
+        public static readonly DependencyProperty EnabledProperty =
+            DependencyProperty.Register(
+                nameof(Enabled),
+                typeof(bool),
+                typeof(Dialog),
+                new PropertyMetadata(default(bool)));
+
+        /// <summary>Включить диалог</summary>
+        //[Category("")]
+        [Description("Включить диалог")]
+        public bool Enabled
+        {
+            get => (bool)GetValue(EnabledProperty); 
+            set => SetValue(EnabledProperty, value);
+        }
+
         #endregion
 
+        #endregion
+
+        /// <summary>Объект для межптоковой синхронизации</summary>
         protected readonly object _OpenSyncRoot = new();
 
-        protected ICommand _OpenCommand;
+        /// <summary>Команда открытия диалога</summary>
+        protected Command? _OpenCommand;
 
-        public ICommand OpenCommand => _OpenCommand;
+        /// <summary>Команда открытия диалога</summary>
+        public ICommand OpenCommand => _OpenCommand ??= Command.New(Open, _ => Enabled && !IsOpened);
 
-        protected Dialog() => _OpenCommand = new LambdaCommand((Action)Open, p => !IsOpened);
-
+        /// <summary>Показать диалог</summary>
         public void Open()
         {
-            if(IsOpened) return;
+            if(!Enabled || IsOpened) return;
             lock (_OpenSyncRoot)
             {
-                if(IsOpened) return;
+                if(!Enabled || IsOpened) return;
                 IsOpened = true;
                 try
                 {
@@ -114,12 +146,14 @@ namespace MathCore.WPF.Dialogs
             }
         }
 
+        /// <summary>Показать диалог</summary>
+        /// <param name="p">Параметр</param>
         public virtual void Open(object? p)
         {
-            if(IsOpened) return;
+            if(!Enabled || IsOpened) return;
             lock (_OpenSyncRoot)
             {
-                if(IsOpened) return;
+                if(!Enabled || IsOpened) return;
                 IsOpened = true;
                 try
                 {
@@ -135,20 +169,22 @@ namespace MathCore.WPF.Dialogs
             }
         }
 
+        /// <summary>Открыть диалог</summary>
         protected virtual void OpenDialog() => OpenDialog(null);
 
+        /// <summary>Открыть диалог</summary>
         protected abstract void OpenDialog(object? p);
 
         #region ICommand implimentation
 
-        bool ICommand.CanExecute(object parameter) => _OpenCommand.CanExecute(parameter);
+        bool ICommand.CanExecute(object? parameter) => OpenCommand.CanExecute(parameter);
 
-        void ICommand.Execute(object parameter) => _OpenCommand.Execute(parameter);
+        void ICommand.Execute(object? parameter) => OpenCommand.Execute(parameter);
 
-        event EventHandler ICommand.CanExecuteChanged
+        event EventHandler? ICommand.CanExecuteChanged
         {
-            add => _OpenCommand.CanExecuteChanged += value;
-            remove => _OpenCommand.CanExecuteChanged -= value;
+            add => OpenCommand.CanExecuteChanged += value;
+            remove => OpenCommand.CanExecuteChanged -= value;
         }
 
         #endregion 
